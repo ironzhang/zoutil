@@ -10,10 +10,11 @@ import (
 )
 
 type Zerone struct {
-	Node          string
-	Timeout       time.Duration
-	ClientVerbose int
-	ServerVerbose int
+	Timeout time.Duration
+
+	node          string
+	clientVerbose int
+	serverVerbose int
 
 	zerone  zerone.Zerone
 	clients sync.Map
@@ -30,10 +31,10 @@ func Open(node string, opts Options) (*Zerone, error) {
 		return nil, err
 	}
 	return &Zerone{
-		Node:          node,
 		Timeout:       time.Duration(opts.Timeout),
-		ClientVerbose: opts.ClientVerbose,
-		ServerVerbose: opts.ServerVerbose,
+		node:          node,
+		clientVerbose: opts.ClientVerbose,
+		serverVerbose: opts.ServerVerbose,
 		zerone:        z,
 	}, nil
 }
@@ -54,16 +55,42 @@ func (z *Zerone) Close() error {
 	return z.zerone.Close()
 }
 
+func (z *Zerone) GetClientVerbose() int {
+	return z.clientVerbose
+}
+
+func (z *Zerone) SetClientVerbose(verbose int) {
+	z.clientVerbose = verbose
+	z.clients.Range(func(key, value interface{}) bool {
+		c := value.(*zclient.Client)
+		c.SetTraceVerbose(verbose)
+		return true
+	})
+}
+
+func (z *Zerone) GetServerVerbose() int {
+	return z.serverVerbose
+}
+
+func (z *Zerone) SetServerVerbose(verbose int) {
+	z.serverVerbose = verbose
+	z.servers.Range(func(key, value interface{}) bool {
+		s := value.(*zserver.Server)
+		s.SetTraceVerbose(verbose)
+		return true
+	})
+}
+
 func (z *Zerone) NewClient(service string) (*zclient.Client, error) {
 	if v, ok := z.clients.Load(service); ok {
 		return v.(*zclient.Client), nil
 	}
 
-	c, err := z.zerone.NewClient(z.Node, service)
+	c, err := z.zerone.NewClient(z.node, service)
 	if err != nil {
 		return nil, err
 	}
-	c.SetTraceVerbose(z.ClientVerbose)
+	c.SetTraceVerbose(z.clientVerbose)
 
 	if v, loaded := z.clients.LoadOrStore(service, c); loaded {
 		c.Close()
@@ -72,20 +99,34 @@ func (z *Zerone) NewClient(service string) (*zclient.Client, error) {
 	return c, nil
 }
 
+func (z *Zerone) GetClient(service string) (*zclient.Client, bool) {
+	if v, ok := z.clients.Load(service); ok {
+		return v.(*zclient.Client), true
+	}
+	return nil, false
+}
+
 func (z *Zerone) NewServer(service string) (*zserver.Server, error) {
 	if v, ok := z.servers.Load(service); ok {
 		return v.(*zserver.Server), nil
 	}
 
-	s, err := z.zerone.NewServer(z.Node, service)
+	s, err := z.zerone.NewServer(z.node, service)
 	if err != nil {
 		return nil, err
 	}
-	s.SetTraceVerbose(z.ServerVerbose)
+	s.SetTraceVerbose(z.serverVerbose)
 
 	if v, loaded := z.servers.LoadOrStore(service, s); loaded {
 		s.Close()
 		return v.(*zserver.Server), nil
 	}
 	return s, nil
+}
+
+func (z *Zerone) GetServer(service string) (*zserver.Server, bool) {
+	if v, ok := z.servers.Load(service); ok {
+		return v.(*zserver.Server), true
+	}
+	return nil, false
 }
