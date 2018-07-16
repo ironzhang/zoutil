@@ -55,6 +55,10 @@ func (z *Zerone) Close() error {
 	return z.zerone.Close()
 }
 
+func (z *Zerone) Node() string {
+	return z.node
+}
+
 func (z *Zerone) GetClientVerbose() int {
 	return z.clientVerbose
 }

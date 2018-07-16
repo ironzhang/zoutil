@@ -4,17 +4,42 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/ironzhang/x-pearls/config"
 	"github.com/ironzhang/x-pearls/log"
 	"github.com/ironzhang/zoutil"
 )
+
+type Register interface {
+	RegisterName(name string, rcvr interface{}) error
+}
+
+func RegisterCommand(r Register, z *zoutil.Zerone) error {
+	return r.RegisterName("command", NewServer(z))
+}
 
 type Server struct {
 	zerone *zoutil.Zerone
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewServer(zerone *zoutil.Zerone) *Server {
+	return &Server{zerone: zerone}
+}
+
+func (p *Server) GetNodeName(ctx context.Context, args interface{}, node *string) error {
+	*node = p.zerone.Node()
+	return nil
+}
+
+func (p *Server) GetTimeout(ctx context.Context, args interface{}, timeout *config.Duration) error {
+	*timeout = config.Duration(p.zerone.Timeout)
+	return nil
+}
+
+func (p *Server) SetTimeout(ctx context.Context, timeout config.Duration, reply interface{}) error {
+	p.zerone.Timeout = time.Duration(timeout)
+	return nil
 }
 
 func (p *Server) GetLogLevel(ctx context.Context, args interface{}, level *string) error {
